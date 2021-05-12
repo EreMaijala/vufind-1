@@ -107,7 +107,11 @@ class Holds extends AbstractRequestBase
         if (!empty($all)) {
             $details = $params->fromPost('cancelAllIDS');
         } elseif (!empty($selected)) {
-            $details = $params->fromPost('cancelSelectedIDS');
+            // Include cancelSelectedIDS for backwards-compatibility:
+            $details = $params->fromPost(
+                'selectedIDS',
+                $params->fromPost('cancelSelectedIDS')
+            );
         } else {
             // No button pushed -- no action needed
             return [];
@@ -170,6 +174,78 @@ class Holds extends AbstractRequestBase
             }
         } else {
             $flashMsg->addMessage('hold_empty_selection', 'error');
+        }
+        return [];
+    }
+
+    /**
+     * Update ILS details with update information, if appropriate.
+     *
+     * @param \VuFind\ILS\Connection $catalog      ILS connection object
+     * @param array                  $ilsDetails   Hold details from ILS driver's
+     * getMyHolds() method
+     * @param array                  $updateFields Fields to update from ILS driver's
+     * getConfig() method
+     *
+     * @return array $ilsDetails with info added
+     */
+    public function addUpdateDetails($catalog, $ilsDetails, $updateFields)
+    {
+        if ($updateFields) {
+            $updateDetails = $catalog->getUpdateHoldDetails($ilsDetails);
+            if ($updateDetails !== '') {
+                $ilsDetails['updateDetails'] = $updateDetails;
+                $this->rememberValidId($ilsDetails['updateDetails']);
+            }
+        }
+
+        return $ilsDetails;
+    }
+
+    /**
+     * Process update requests.
+     *
+     * @param \VuFind\ILS\Connection $catalog ILS connection object
+     * @param array                  $patron  Current logged in patron
+     *
+     * @return array                          The result of the updates, an
+     * associative array keyed by item ID (empty if no updates performed)
+     */
+    public function updateHolds($catalog, $patron)
+    {
+        // Retrieve the flashMessenger helper:
+        $flashMsg = $this->getController()->flashMessenger();
+        $params = $this->getController()->params();
+
+        if (!$params->fromPost('updateHolds')) {
+            // No button pressed
+            return [];
+        }
+
+        $details = $params->fromPost('selectedIDS');
+        if (empty($details)) {
+            $flashMsg->addMessage('hold_empty_selection', 'error');
+            return [];
+        }
+
+        $fields = $params->fromPost('gatheredDetails');
+        if ($fields) {
+            // If the user input contains a value not found in the session
+            // legal list, something has been tampered with -- abort the process.
+            if (array_diff($details, $this->getSession()->validIds)) {
+                $flashMsg->addMessage('error_inconsistent_parameters', 'error');
+                return [];
+            }
+
+            $results = $catalog->updateHolds($patron, $details, $fields);
+            if ($results['count'] > 0) {
+                $msg = $this->getController()->translate(
+                    'hold_update_success_items',
+                    ['%%count%%' => $results['count']]
+                );
+                $flashMsg->addMessage($msg, 'success');
+            }
+            return $results;
         }
         return [];
     }

@@ -40,9 +40,11 @@ VuFind.register('lightbox', function Lightbox() {
   }
 
   // Public: Present an alert
-  function showAlert(message, _type) {
+  function showAlert(message, _type, _additionalContent) {
     var type = _type || 'info';
+    var additionalContent = _additionalContent || '';
     _html('<div class="flash-message alert alert-' + type + '">' + message + '</div>'
+        + additionalContent
         + '<button class="btn btn-default" data-dismiss="modal">' + VuFind.translate('close') + '</button>');
     _modal.modal('show');
   }
@@ -82,7 +84,11 @@ VuFind.register('lightbox', function Lightbox() {
         location.href = href;
         close();
       } else {
-        showAlert(msgs, 'success');
+        // Show any other alerts as well
+        var otherAlerts = htmlDiv.find('.flash-message:not(.alert-success):not([data-lightbox-ignore])').toArray().map(function getAlertHtml(el) {
+          return el.outerHTML;
+        }).join('');
+        showAlert(msgs, 'success', otherAlerts);
       }
       return;
     }

@@ -16,4 +16,8 @@ $(document).ready(function cancelRequestsHandlers() {
   $('.confirm_cancel_no').click(function doNotCancelRequest(e) {
     e.preventDefault();
   });
+  $('#update_selected').click(function updateSelected(e) {
+    // Reset submitType to indicate that this is not a cancel request:
+    $('#submitType').val('0');
+  });
 });

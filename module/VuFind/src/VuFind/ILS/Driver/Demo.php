@@ -498,8 +498,11 @@ class Demo extends AbstractBase
                 $pos = rand() % 5;
                 if ($pos > 1) {
                     $currentItem['position'] = $pos;
+                    $currentItem['available'] = false;
+                    $currentItem['in_transit'] = (rand() % 2) === 1;
                 } else {
                     $currentItem['available'] = true;
+                    $currentItem['in_transit'] = false;
                     if (rand() % 3 != 1) {
                         $lastDate = strtotime('now + 3 days');
                         $currentItem['last_pickup_date'] = $this->dateConverter
@@ -1609,6 +1612,107 @@ class Demo extends AbstractBase
     }
 
     /**
+     * Get Update Hold Details
+     *
+     * Get required data for updating a hold. This value is relayed to the
+     * updateHolds function when the user attempts to update holds.
+     *
+     * N.B. This must return same information as getCancelHoldDetails since it is
+     * only used when canceling is not possible but updating is, and there's only
+     * one set of identifying checkboxes for the holds.
+     *
+     * @param array $holdDetails An array of hold data
+     *
+     * @return string Data for use in a form field
+     */
+    public function getUpdateHoldDetails($holdDetails)
+    {
+        return $holdDetails['available'] || $holdDetails['in_transit'] ? ''
+            : $holdDetails['reqnum'];
+    }
+
+    /**
+     * Update holds
+     *
+     * This is responsible for changing the status of hold requests
+     *
+     * @param array  $patron       Patron array
+     * @param array  $holdsDetails The details identifying patron and the holds (from
+     * getUpdateHoldDetails)
+     * @param array  $fields       An associative array of fields to be updated
+     *
+     * @return array Associative array of the results
+     */
+    public function updateHolds(array $patron, array $holdsDetails, array $fields
+    ): array {
+        $results = [];
+        foreach ($session->holds as &$currentHold) {
+            if (!in_array($currentHold['reqnum'], $holdsDetails)) {
+                continue;
+            }
+            $requestId = $currentHold['reqnum'];
+            if (isset($fields['frozen'])) {
+                $currentHold['frozen'] = $fields['frozen'];
+                // TODO:
+                if ($fields['frozen']) {
+                    if (isset($fields['frozenUntil'])) {
+                        $updateFields['suspended_until']
+                            = \DateTime::createFromFormat(
+                                'U',
+                                $fields['startDateTS']
+                            )->modify('-1 DAY')->format('Y-m-d');
+                        $result = false;
+                    } else {
+                        $result = $this->makeRequest(
+                            [
+                                'path' => ['v1', 'holds', $requestId, 'suspension'],
+                                'method' => 'POST',
+                                'errors' => true
+                            ]
+                        );
+                    }
+                } else {
+                    $result = $this->makeRequest(
+                        [
+                            'path' => ['v1', 'holds', $requestId, 'suspension'],
+                            'method' => 'DELETE',
+                            'errors' => true
+                        ]
+                    );
+                }
+                if ($result && $result['code'] >= 300) {
+                    $results[$requestId]['errors'] = $this->holdError(
+                        $result['data']['error'] ?? 'hold_error_update_failed'
+                    );
+                }
+            }
+            if (empty($results[$requestId]['errors'])) {
+                if (isset($fields['pickUpLocation'])) {
+                    $updateFields['branchcode'] = $fields['pickUpLocation'];
+                }
+                if ($updateFields) {
+                    $result = $this->makeRequest(
+                        [
+                            'path' => ['v1', 'holds', $requestId],
+                            'method' => 'PUT',
+                            'errors' => true
+                        ]
+                    );
+                    if ($result['code'] >= 300) {
+                        $results[$requestId]['errors'] = $this->holdError(
+                            $result['data']['error'] ?? 'hold_error_update_failed'
+                        );
+                    }
+                }
+            }
+
+            $results[$requestId]['success'] = empty($results[$requestId]['errors']);
+        }
+
+        return $results;
+    }
+
+    /**
      * Cancel Storage Retrieval Request
      *
      * Attempts to Cancel a Storage Retrieval Request on a particular item. The
@@ -2312,12 +2416,13 @@ class Demo extends AbstractBase
     {
         $this->checkIntermittentFailure();
         if ($function == 'Holds') {
-            return [
-                'HMACKeys' => 'id:item_id:level',
-                'extraHoldFields' =>
-                    'comments:requestGroup:pickUpLocation:requiredByDate',
-                'defaultRequiredDate' => 'driver:0:2:0',
-            ];
+            return $this->config['Holds']
+                ?? [
+                    'HMACKeys' => 'id:item_id:level',
+                    'extraHoldFields' =>
+                        'comments:requestGroup:pickUpLocation:requiredByDate',
+                    'defaultRequiredDate' => 'driver:0:2:0',
+                ];
         }
         if ($function == 'Holdings') {
             return [

@@ -1185,8 +1185,18 @@ class MyResearchController extends AbstractBase
             return $view->cancelResults;
         }
 
-        // By default, assume we will not need to display a cancel form:
+        // Process update requests if necessary:
+        if ($this->params()->fromPost('updateSelected')) {
+            return $this->forwardTo('MyResearch', 'EditHolds');
+        }
+        $holdConfig = $catalog->checkFunction('Holds', compact('patron'));
+        $view = $this->createViewModel();
+        $view->updateResults = !empty($holdConfig['updateFields'])
+            ? $this->holds()->updateHolds($catalog, $patron) : [];
+
+        // By default, assume we will not need to display a cancel or update form:
         $view->cancelForm = false;
+        $view->updateForm = false;
 
         // Get held item details:
         $result = $catalog->getMyHolds($patron);
@@ -1194,17 +1204,29 @@ class MyResearchController extends AbstractBase
         $this->holds()->resetValidation();
         foreach ($result as $current) {
             // Add cancel details if appropriate:
-            $current = $this->holds()->addCancelDetails(
+            $ilsDetails = $this->holds()->addCancelDetails(
                 $catalog, $current, $cancelStatus
             );
             if ($cancelStatus && $cancelStatus['function'] != "getCancelHoldLink"
-                && isset($current['cancel_details'])
+                && isset($ilsDetails['cancel_details'])
             ) {
                 // Enable cancel form if necessary:
                 $view->cancelForm = true;
             }
 
-            $driversNeeded[] = $current;
+            // Add update details if appropriate
+            if (!empty($holdConfig['updateFields'])) {
+                $ilsDetails = $this->holds()->addUpdateDetails(
+                    $catalog,
+                    $current,
+                    $holdConfig['updateFields']
+                );
+                if (isset($ilsDetails['updateDetails'])) {
+                    $view->updateForm = true;
+                }
+            }
+
+            $driversNeeded[] = $ilsDetails;
         }
 
         // Get List of PickUp Libraries based on patron's home library
@@ -1220,6 +1242,46 @@ class MyResearchController extends AbstractBase
         return $view;
     }
 
+    /**
+     * Edit holds
+     *
+     * @return mixed
+     */
+    public function editHoldsAction()
+    {
+        // Stop now if the user does not have valid catalog credentials available:
+        if (!is_array($patron = $this->catalogLogin())) {
+            return $patron;
+        }
+
+        // Connect to the ILS:
+        $catalog = $this->getILS();
+
+        $holdConfig = $catalog->checkFunction('Holds', compact('patron'));
+        $details = $this->params()->fromPost('selectedIDS');
+        if (empty($holdConfig['updateFields']) || empty($details)) {
+            // Shouldn't be here. Redirect to holds
+            return $this->redirect()->toRoute('myresearch-holds');
+        }
+
+        $view = $this->createViewModel(
+            [
+                'selectedIDS' => $details,
+                'fields' => $holdConfig['updateFields'],
+                'gatheredDetails' => $this->params()->fromPost('gatheredDetails', [])
+            ]
+        );
+
+        // Get List of PickUp Libraries based on patron's home library
+        try {
+            $view->pickup = $catalog->getPickUpLocations($patron);
+        } catch (\Exception $e) {
+            // Do nothing; if we're unable to load information about pickup
+            // locations, they are not supported and we should ignore them.
+        }
+
+        return $view;
+    }
     /**
      * Send list of storage retrieval requests to view
      *

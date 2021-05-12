@@ -963,6 +963,55 @@ class MultiBackend extends AbstractBase implements \Laminas\Log\LoggerAwareInter
     }
 
     /**
+     * Update holds
+     *
+     * This is responsible for changing the status of hold requests
+     *
+     * @param array  $holdsDetails The details identifying patron and the holds (from
+     * getUpdateHoldDetails)
+     * @param array  $fields       An associative array of fields to be updated
+     *
+     * @return array Associative array of the results
+     */
+    public function updateHolds(array $holdsDetails, array $fields)
+    {
+        $source = $this->getSource($holdsDetails['patron']['cat_username']);
+        $driver = $this->getDriver($source);
+        if ($driver) {
+            return $driver->UpdateHolds(
+                $this->stripIdPrefixes($holdsDetails, $source),
+                $fields
+            );
+        }
+        throw new ILSException('No suitable backend driver found');
+    }
+
+    /**
+     * Get Update Hold Details
+     *
+     * Get required data for updating a hold. This value is relayed to the
+     * updateHolds function when the user attempts to update holds.
+     *
+     * @param array $holdDetails An array of hold data
+     *
+     * @return string Data for use in a form field
+     */
+    public function getUpdateHoldDetails($holdDetails)
+    {
+        $source = $this->getSource(
+            $holdDetails['id'] ?? $holdDetails['item_id'] ?? ''
+        );
+        $driver = $this->getDriver($source);
+        if ($driver) {
+            $holdDetails = $this->stripIdPrefixes(
+                $holdDetails, $source, ['id', 'item_id', 'cat_username']
+            );
+            return $driver->getUpdateHoldDetails($holdDetails);
+        }
+        throw new ILSException('No suitable backend driver found');
+    }
+
+    /**
      * Place Storage Retrieval Request
      *
      * Attempts to place a storage retrieval request on a particular item and returns

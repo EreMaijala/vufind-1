@@ -109,10 +109,12 @@ trait HoldsTrait
         }
         $pickup = $catalog->getPickUpLocations($patron, $pickupDetails);
 
+        $dateConverter = $this->serviceLocator->get(\VuFind\Date\Converter::class);
+
         // Process form submissions if necessary:
         if (null !== $this->params()->fromPost('placeHold')) {
-            // If the form contained a pickup location or request group, make sure
-            // they are valid:
+            // If the form contained a pickup location, request group, start date or
+            // required by date, make sure they are valid:
             $validGroup = $this->holds()->validateRequestGroupInput(
                 $gatheredDetails, $extraHoldFields, $requestGroups
             );
@@ -120,17 +122,31 @@ trait HoldsTrait
                 $gatheredDetails['pickUpLocation'] ?? null,
                 $extraHoldFields, $pickup
             );
+            $dateValidationResults = $this->holds()->validateDates(
+                $gatheredDetails['startDate'] ?? null,
+                $gatheredDetails['requiredBy'] ?? null,
+                $extraHoldFields
+            );
             if (!$validGroup) {
                 $this->flashMessenger()
-                    ->addMessage('hold_invalid_request_group', 'error');
-            } elseif (!$validPickup) {
-                $this->flashMessenger()->addMessage('hold_invalid_pickup', 'error');
-            } else {
+                    ->addErrorMessage('hold_invalid_request_group');
+            }
+            if (!$validPickup) {
+                $this->flashMessenger()->addErrorMessage('hold_invalid_pickup');
+            }
+            foreach ($dateValidationResults['errors'] as $msg) {
+                $this->flashMessenger()->addErrorMessage($msg);
+            }
+            if ($validGroup && $validPickup && !$dateValidationResults['errors']) {
                 // If we made it this far, we're ready to place the hold;
                 // if successful, we will redirect and can stop here.
 
-                // Add Patron Data to Submitted Data
-                $holdDetails = $gatheredDetails + ['patron' => $patron];
+                // Add patron data and converted dates to submitted data
+                $holdDetails = $gatheredDetails + [
+                    'patron' => $patron,
+                    'startDateTS' => $dateValidationResults['startDateTS'],
+                    'requiredByTS' => $dateValidationResults['requiredByTS'],
+                ];
 
                 // Attempt to place the hold:
                 $function = (string)$checkHolds['function'];
@@ -146,6 +162,10 @@ trait HoldsTrait
                         ],
                     ];
                     $this->flashMessenger()->addMessage($msg, 'success');
+                    if (!empty($results['warningMessage'])) {
+                        $this->flashMessenger()
+                            ->addWarningMessage($results['warningMessage']);
+                    }
                     return $this->redirectToRecord('#top');
                 } else {
                     // Failure: use flash messenger to display messages, stay on
@@ -162,12 +182,19 @@ trait HoldsTrait
             }
         }
 
+        // Set default start date to today:
+        $defaultStartDate = $dateConverter->convertToDisplayDate('U', time());
+
         // Find and format the default required date:
-        $defaultRequired = $this->holds()->getDefaultRequiredDate(
-            $checkHolds, $catalog, $patron, $gatheredDetails
+        $defaultRequired = $dateConverter->convertToDisplayDate(
+            'U',
+            $this->holds()->getDefaultRequiredDate(
+               $checkHolds,
+               $catalog,
+               $patron,
+               $gatheredDetails
+            )
         );
-        $defaultRequired = $this->serviceLocator->get(\VuFind\Date\Converter::class)
-            ->convertToDisplayDate("U", $defaultRequired);
         try {
             $defaultPickup
                 = $catalog->getDefaultPickUpLocation($patron, $gatheredDetails);
@@ -192,6 +219,7 @@ trait HoldsTrait
                 'homeLibrary' => $allowHomeLibrary
                     ? $this->getUser()->home_library : '',
                 'extraHoldFields' => $extraHoldFields,
+                'defaultStartDate' => $defaultStartDate,
                 'defaultRequiredDate' => $defaultRequired,
                 'requestGroups' => $requestGroups,
                 'defaultRequestGroup' => $defaultRequestGroup,
