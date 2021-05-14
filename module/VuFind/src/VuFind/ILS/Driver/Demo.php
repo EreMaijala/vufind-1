@@ -1621,14 +1621,14 @@ class Demo extends AbstractBase
      * only used when canceling is not possible but updating is, and there's only
      * one set of identifying checkboxes for the holds.
      *
-     * @param array $holdDetails An array of hold data
+     * @param array $hold An array of hold data
      *
      * @return string Data for use in a form field
      */
-    public function getUpdateHoldDetails($holdDetails)
+    public function getUpdateHoldDetails($hold)
     {
-        return $holdDetails['available'] || $holdDetails['in_transit'] ? ''
-            : $holdDetails['reqnum'];
+        return empty($hold['available']) && empty($hold['in_transit'])
+            ? $hold['reqnum'] : '';
     }
 
     /**
@@ -1636,77 +1636,46 @@ class Demo extends AbstractBase
      *
      * This is responsible for changing the status of hold requests
      *
-     * @param array  $patron       Patron array
-     * @param array  $holdsDetails The details identifying patron and the holds (from
+     * @param array $patron       Patron array
+     * @param array $holdsDetails The details identifying the holds (from
      * getUpdateHoldDetails)
-     * @param array  $fields       An associative array of fields to be updated
+     * @param array $fields       An associative array of fields to be updated
      *
      * @return array Associative array of the results
      */
     public function updateHolds(array $patron, array $holdsDetails, array $fields
     ): array {
         $results = [];
+        $session = $this->getSession($patron['id']);
         foreach ($session->holds as &$currentHold) {
-            if (!in_array($currentHold['reqnum'], $holdsDetails)) {
+            $requestId = $this->getUpdateHoldDetails($currentHold);
+            if (!in_array($requestId, $holdsDetails)) {
                 continue;
             }
-            $requestId = $currentHold['reqnum'];
-            if (isset($fields['frozen'])) {
-                $currentHold['frozen'] = $fields['frozen'];
-                // TODO:
+            if ($this->isFailing(__METHOD__, 25)) {
+                $results[$requestId]['success'] = false;
+                $results[$requestId]['status']
+                    = 'Simulated error; try again and it will work eventually.';
+                continue;
+            }
+            if (array_key_exists('frozen', $fields)) {
                 if ($fields['frozen']) {
+                    $currentHold['frozen'] = true;
                     if (isset($fields['frozenUntil'])) {
-                        $updateFields['suspended_until']
-                            = \DateTime::createFromFormat(
-                                'U',
-                                $fields['startDateTS']
-                            )->modify('-1 DAY')->format('Y-m-d');
-                        $result = false;
+                        $currentHold['frozen_until'] = $this->dateConverter
+                            ->convertToDisplayDate('U', $fields['frozenUntilTS']);
                     } else {
-                        $result = $this->makeRequest(
-                            [
-                                'path' => ['v1', 'holds', $requestId, 'suspension'],
-                                'method' => 'POST',
-                                'errors' => true
-                            ]
-                        );
+                        $currentHold['frozen_until'] = '';
                     }
                 } else {
-                    $result = $this->makeRequest(
-                        [
-                            'path' => ['v1', 'holds', $requestId, 'suspension'],
-                            'method' => 'DELETE',
-                            'errors' => true
-                        ]
-                    );
-                }
-                if ($result && $result['code'] >= 300) {
-                    $results[$requestId]['errors'] = $this->holdError(
-                        $result['data']['error'] ?? 'hold_error_update_failed'
-                    );
+                    $currentHold['frozen'] = false;
+                    $currentHold['frozen_until'] = '';
                 }
             }
-            if (empty($results[$requestId]['errors'])) {
-                if (isset($fields['pickUpLocation'])) {
-                    $updateFields['branchcode'] = $fields['pickUpLocation'];
-                }
-                if ($updateFields) {
-                    $result = $this->makeRequest(
-                        [
-                            'path' => ['v1', 'holds', $requestId],
-                            'method' => 'PUT',
-                            'errors' => true
-                        ]
-                    );
-                    if ($result['code'] >= 300) {
-                        $results[$requestId]['errors'] = $this->holdError(
-                            $result['data']['error'] ?? 'hold_error_update_failed'
-                        );
-                    }
-                }
+            if (isset($fields['pickUpLocation'])) {
+                $currentHold['location'] = $fields['pickUpLocation'];
             }
-
-            $results[$requestId]['success'] = empty($results[$requestId]['errors']);
+            $results[$requestId]['success'] = true;
         }
 
         return $results;
@@ -1929,26 +1898,10 @@ class Demo extends AbstractBase
             ? $session->holds[$lastHold]['item_id'] + 1 : 0;
 
         // Figure out appropriate expiration date:
-        if (!isset($holdDetails['requiredBy'])
-            || empty($holdDetails['requiredBy'])
-        ) {
+        if (empty($holdDetails['requiredBy'])) {
             $expire = strtotime("now + 30 days");
         } else {
-            try {
-                $expire = $this->dateConverter->convertFromDisplayDate(
-                    "U", $holdDetails['requiredBy']
-                );
-            } catch (DateException $e) {
-                // Expiration date is invalid
-                return [
-                    'success' => false, 'sysMessage' => 'hold_date_invalid'
-                ];
-            }
-        }
-        if ($expire <= time()) {
-            return [
-                'success' => false, 'sysMessage' => 'hold_date_past'
-            ];
+            $expire = $holdDetails['requiredByTS'];
         }
 
         $requestGroup = '';
@@ -1960,6 +1913,19 @@ class Demo extends AbstractBase
                 break;
             }
         }
+        if (!empty($holdDetails['startDate'])) {
+            $frozen = true;
+            $frozenUntil = $this->dateConverter->convertToDisplayDate(
+                'U',
+                \DateTime::createFromFormat(
+                    'U',
+                    $holdDetails['startDateTS']
+                )->modify('-1 DAY')->getTimestamp()
+            );
+        } else {
+            $frozen = false;
+            $frozenUntil = '';
+        }
         $session->holds->append(
             [
                 'id'       => $holdDetails['id'],
@@ -1970,10 +1936,12 @@ class Demo extends AbstractBase
                 'create'   =>
                     $this->dateConverter->convertToDisplayDate('U', time()),
                 'reqnum'   => sprintf('%06d', $nextId),
-                'item_id' => $nextId,
-                'volume' => '',
+                'item_id'  => $nextId,
+                'volume'   => '',
                 'processed' => '',
-                'requestGroup' => $requestGroup
+                'requestGroup' => $requestGroup,
+                'frozen'   => $frozen,
+                'frozen_until' => $frozenUntil
             ]
         );
 

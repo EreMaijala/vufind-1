@@ -135,6 +135,16 @@ abstract class AbstractRequestBase extends AbstractPlugin
     }
 
     /**
+     * Get the list of valid IDs.
+     *
+     * @return array
+     */
+    public function getValidIds()
+    {
+        return $this->getSession()->validIds ?? [];
+    }
+
+    /**
      * Method for validating contents of a request; returns an array of
      * collected details if request is valid, otherwise returns false.
      *
@@ -386,6 +396,43 @@ abstract class AbstractRequestBase extends AbstractPlugin
         return $result;
     }
 
+    /**
+     * Check if the user-provided "frozen until" date is valid.
+     *
+     * Returns validated date and/or an array of validation errors if there are
+     * problems.
+     *
+     * @param string $frozenUntil     User-specified "frozen until" date
+     * @param array  $extraHoldFields Hold form fields enabled by
+     * configuration/driver
+     *
+     * @return array
+     */
+    public function validateFrozenUntil($frozenUntil, $extraHoldFields)
+    {
+        $result = [
+            'frozenUntilTS' => null,
+            'errors' => [],
+        ];
+        if (!in_array('frozenUntil', $extraHoldFields) || empty($frozenUntil)) {
+            return $result;
+        }
+
+        $errors = [];
+        try {
+            $result['frozenUntilTS'] = $frozenUntil
+                ? $this->dateConverter->convertFromDisplayDate('U', $frozenUntil)
+                : 0;
+            if ($result['frozenUntilTS'] < time()) {
+                $errors[] = 'hold_frozen_until_date_invalid';
+            }
+        } catch (DateException $e) {
+            $errors[] = 'hold_frozen_until_date_invalid';
+        }
+
+        $result['errors'] = $errors;
+        return $result;
+    }
 
     /**
      * Support method for getDefaultRequiredDate() -- generate a date based

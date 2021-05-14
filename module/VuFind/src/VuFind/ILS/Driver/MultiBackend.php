@@ -967,19 +967,21 @@ class MultiBackend extends AbstractBase implements \Laminas\Log\LoggerAwareInter
      *
      * This is responsible for changing the status of hold requests
      *
-     * @param array  $holdsDetails The details identifying patron and the holds (from
+     * @param array $patron       Patron array
+     * @param array $holdsDetails The details identifying the holds (from
      * getUpdateHoldDetails)
-     * @param array  $fields       An associative array of fields to be updated
+     * @param array $fields       An associative array of fields to be updated
      *
      * @return array Associative array of the results
      */
-    public function updateHolds(array $holdsDetails, array $fields)
+    public function updateHolds(array $patron, array $holdsDetails, array $fields)
     {
         $source = $this->getSource($holdsDetails['patron']['cat_username']);
         $driver = $this->getDriver($source);
         if ($driver) {
             return $driver->UpdateHolds(
-                $this->stripIdPrefixes($holdsDetails, $source),
+                $this->stripIdPrefixes($patron, $source),
+                $holdsDetails,
                 $fields
             );
         }
@@ -992,21 +994,19 @@ class MultiBackend extends AbstractBase implements \Laminas\Log\LoggerAwareInter
      * Get required data for updating a hold. This value is relayed to the
      * updateHolds function when the user attempts to update holds.
      *
-     * @param array $holdDetails An array of hold data
+     * @param array $hold An array of hold data
      *
      * @return string Data for use in a form field
      */
-    public function getUpdateHoldDetails($holdDetails)
+    public function getUpdateHoldDetails($hold)
     {
-        $source = $this->getSource(
-            $holdDetails['id'] ?? $holdDetails['item_id'] ?? ''
-        );
+        $source = $this->getSource($hold['id'] ?? $hold['item_id'] ?? '');
         $driver = $this->getDriver($source);
         if ($driver) {
-            $holdDetails = $this->stripIdPrefixes(
-                $holdDetails, $source, ['id', 'item_id', 'cat_username']
+            $hold = $this->stripIdPrefixes(
+                $hold, $source, ['id', 'item_id', 'cat_username']
             );
-            return $driver->getUpdateHoldDetails($holdDetails);
+            return $driver->getUpdateHoldDetails($hold);
         }
         throw new ILSException('No suitable backend driver found');
     }

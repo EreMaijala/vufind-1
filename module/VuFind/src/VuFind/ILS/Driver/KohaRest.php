@@ -1130,14 +1130,14 @@ class KohaRest extends \VuFind\ILS\Driver\AbstractBase implements
      * only used when canceling is not possible but updating is, and there's only
      * one set of identifying checkboxes for the holds.
      *
-     * @param array $holdDetails An array of hold data
+     * @param array $hold An array of hold data
      *
      * @return string Data for use in a form field
      */
-    public function getUpdateHoldDetails($holdDetails)
+    public function getUpdateHoldDetails($hold)
     {
-        return $holdDetails['available'] || $holdDetails['in_transit'] ? ''
-            : $holdDetails['requestId'];
+        return $hold['available'] || $hold['in_transit'] ? ''
+            : $hold['requestId'];
     }
 
     /**
@@ -1145,10 +1145,10 @@ class KohaRest extends \VuFind\ILS\Driver\AbstractBase implements
      *
      * This is responsible for changing the status of hold requests
      *
-     * @param array  $patron       Patron array
-     * @param array  $holdsDetails The details identifying patron and the holds (from
+     * @param array $patron       Patron array
+     * @param array $holdsDetails The details identifying the holds (from
      * getUpdateHoldDetails)
-     * @param array  $fields       An associative array of fields to be updated
+     * @param array $fields       An associative array of fields to be updated
      *
      * @return array Associative array of the results
      */
@@ -1186,9 +1186,8 @@ class KohaRest extends \VuFind\ILS\Driver\AbstractBase implements
                     );
                 }
                 if ($result && $result['code'] >= 300) {
-                    $results[$requestId]['errors'] = $this->holdError(
-                        $result['data']['error'] ?? 'hold_error_update_failed'
-                    );
+                    $results[$requestId]['status']
+                        = $result['data']['error'] ?? 'hold_error_update_failed';
                 }
             }
             if (empty($results[$requestId]['errors'])) {
@@ -1204,14 +1203,13 @@ class KohaRest extends \VuFind\ILS\Driver\AbstractBase implements
                         ]
                     );
                     if ($result['code'] >= 300) {
-                        $results[$requestId]['errors'] = $this->holdError(
-                            $result['data']['error'] ?? 'hold_error_update_failed'
-                        );
+                        $results[$requestId]['status']
+                            = $result['data']['error'] ?? 'hold_error_update_failed'
                     }
                 }
             }
 
-            $results[$requestId]['success'] = empty($results[$requestId]['errors']);
+            $results[$requestId]['success'] = empty($results[$requestId]['error']);
         }
 
         return $results;

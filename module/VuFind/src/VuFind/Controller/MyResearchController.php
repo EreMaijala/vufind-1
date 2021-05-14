@@ -1186,13 +1186,24 @@ class MyResearchController extends AbstractBase
         }
 
         // Process update requests if necessary:
+        $updateResultsContainer = $this->getHoldUpdateResultsContainer();
+        $holdUpdateResults = $updateResultsContainer->results ?? null;
+        if ($holdUpdateResults) {
+            $view->updateResults = $holdUpdateResults;
+            $updateResultsContainer->results = null;
+        }
         if ($this->params()->fromPost('updateSelected')) {
-            return $this->forwardTo('MyResearch', 'EditHolds');
+            $details = $this->params()->fromPost('selectedIDS');
+            if (empty($details)) {
+                $this->flashMessenger()->addErrorMessage('hold_empty_selection');
+                if ($this->inLightbox()) {
+                    return $this->getRefreshResponse();
+                }
+            } else {
+                return $this->forwardTo('MyResearch', 'EditHolds');
+            }
         }
         $holdConfig = $catalog->checkFunction('Holds', compact('patron'));
-        $view = $this->createViewModel();
-        $view->updateResults = !empty($holdConfig['updateFields'])
-            ? $this->holds()->updateHolds($catalog, $patron) : [];
 
         // By default, assume we will not need to display a cancel or update form:
         $view->cancelForm = false;
@@ -1263,25 +1274,129 @@ class MyResearchController extends AbstractBase
             // Shouldn't be here. Redirect to holds
             return $this->redirect()->toRoute('myresearch-holds');
         }
+        // If the user input contains a value not found in the session
+        // legal list, something has been tampered with -- abort the process.
+        if (array_diff($details, $this->holds()->getValidIds())) {
+            $this->flashMessenger()
+                ->addErrorMessage('error_inconsistent_parameters');
+            return $this->redirect()->toRoute('myresearch-holds');
+        }
+
+        // Get list of pickup locations based on the first selected hold. This may
+        // not be perfect as pickup locations may differ per request, but it's the
+        // best we can do.
+        $holds = $catalog->getMyHolds($patron);
+        $firstDetails = reset($details);
+        $pickupLocations = [];
+        foreach ($holds as $hold) {
+            if ((string)$catalog->getUpdateHoldDetails($hold) === $firstDetails) {
+                $pickupLocations = $catalog->getPickUpLocations($patron, $hold);
+                break;
+            }
+        }
+
+        $gatheredDetails = $this->params()->fromPost('gatheredDetails', []);
+        if ($this->params()->fromPost('updateHolds')) {
+            $validPickup = true;
+            $selectedPickupLocation = $gatheredDetails['pickUpLocation'] ?? '';
+            if ('' !== $selectedPickupLocation) {
+                $validPickup = $this->holds()->validatePickUpInput(
+                    $selectedPickupLocation,
+                    $holdConfig['updateFields'],
+                    $pickupLocations
+                );
+            }
+            $dateValidationResults = $this->holds()->validateDates(
+                $gatheredDetails['startDate'] ?? null,
+                $gatheredDetails['requiredBy'] ?? null,
+                $holdConfig['updateFields']
+            );
+            if (in_array('frozenUntil', $holdConfig['updateFields'])) {
+                $frozenUntilValidationResults = $this->holds()->validateFrozenUntil(
+                    $gatheredDetails['frozenUntil'] ?? null,
+                    $holdConfig['updateFields']
+                );
+                $dateValidationResults['errors'] = array_unique(
+                    array_merge(
+                        $dateValidationResults['errors'],
+                        $frozenUntilValidationResults['errors']
+                    )
+                );
+            }
+            if (!$validPickup) {
+                $this->flashMessenger()->addErrorMessage('hold_invalid_pickup');
+            }
+            foreach ($dateValidationResults['errors'] as $msg) {
+                $this->flashMessenger()->addErrorMessage($msg);
+            }
+            if ($validPickup && !$dateValidationResults['errors']) {
+                $updateFields = [];
+                if ($selectedPickupLocation !== '') {
+                    $updateFields['pickUpLocation'] = $selectedPickupLocation;
+                }
+                if ($gatheredDetails['startDate'] ?? '' !== '') {
+                    $updateFields['startDate'] = $gatheredDetails['startDate'];
+                    $updateFields['startDateTS']
+                        = $dateValidationResults['startDateTS'];
+                }
+                if (($gatheredDetails['requiredBy'] ?? '') !== '') {
+                    $updateFields['requiredBy'] = $gatheredDetails['requiredBy'];
+                    $updateFields['requiredByTS']
+                        = $dateValidationResults['requiredByTS'];
+                }
+                if (($gatheredDetails['frozen'] ?? '') !== '') {
+                    $updateFields['frozen'] = $gatheredDetails['frozen'] === '1';
+                    if (($gatheredDetails['frozenUntil']) ?? '' !== '') {
+                        $updateFields['frozenUntil']
+                            = $gatheredDetails['frozenUntil'];
+                        $updateFields['frozenUntilTS']
+                            = $frozenUntilValidationResults['frozenUntilTS'];
+                    }
+                }
+
+                $results = $catalog->updateHolds($patron, $details, $updateFields);
+                $successful = 0;
+                $failed = 0;
+                foreach ($results as $result) {
+                    if ($result['success']) {
+                        ++$successful;
+                    } else {
+                        ++$failed;
+                    }
+                }
+                $this->getHoldUpdateResultsContainer()->results = $results;
+                if ($successful) {
+                    $msg = $this->translate(
+                        'hold_edit_success_items',
+                        ['%%count%%' => $successful]
+                    );
+                    $this->flashMessenger()->addSuccessMessage($msg);
+                }
+                if ($failed) {
+                    $msg = $this->translate(
+                        'hold_edit_failed_items',
+                        ['%%count%%' => $failed]
+                    );
+                    $this->flashMessenger()->addErrorMessage($msg);
+                }
+                return $this->inLightbox()
+                    ? $this->getRefreshResponse()
+                    : $this->redirect()->toRoute('myresearch-holds');
+            }
+        }
 
         $view = $this->createViewModel(
             [
                 'selectedIDS' => $details,
                 'fields' => $holdConfig['updateFields'],
-                'gatheredDetails' => $this->params()->fromPost('gatheredDetails', [])
+                'gatheredDetails' => $gatheredDetails,
+                'pickupLocations' => $pickupLocations,
             ]
         );
 
-        // Get List of PickUp Libraries based on patron's home library
-        try {
-            $view->pickup = $catalog->getPickUpLocations($patron);
-        } catch (\Exception $e) {
-            // Do nothing; if we're unable to load information about pickup
-            // locations, they are not supported and we should ignore them.
-        }
-
         return $view;
     }
+
     /**
      * Send list of storage retrieval requests to view
      *
@@ -2339,5 +2454,18 @@ class MyResearchController extends AbstractBase
                 ]
             );
         }
+    }
+
+    /**
+     * Return a session container for hold update results.
+     *
+     * @return \Laminas\Session\Container
+     */
+    protected function getHoldUpdateResultsContainer()
+    {
+        return new \Laminas\Session\Container(
+            'hold_update',
+            $this->serviceLocator->get(\Laminas\Session\SessionManager::class)
+        );
     }
 }

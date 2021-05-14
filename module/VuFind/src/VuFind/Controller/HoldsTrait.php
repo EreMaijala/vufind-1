@@ -141,6 +141,14 @@ trait HoldsTrait
                 // If we made it this far, we're ready to place the hold;
                 // if successful, we will redirect and can stop here.
 
+                // Pass start date to the driver only if it's in the future:
+                if (!empty($gatheredDetails['startDate'])
+                    && $dateValidationResults['startDateTS'] < strtotime('+1 day')
+                ) {
+                    $gatheredDetails['startDate'] = '';
+                    $dateValidationResults['startDateTS'] = 0;
+                }
+
                 // Add patron data and converted dates to submitted data
                 $holdDetails = $gatheredDetails + [
                     'patron' => $patron,
@@ -189,10 +197,10 @@ trait HoldsTrait
         $defaultRequired = $dateConverter->convertToDisplayDate(
             'U',
             $this->holds()->getDefaultRequiredDate(
-               $checkHolds,
-               $catalog,
-               $patron,
-               $gatheredDetails
+                $checkHolds,
+                $catalog,
+                $patron,
+                $gatheredDetails
             )
         );
         try {
