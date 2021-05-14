@@ -1204,7 +1204,7 @@ class KohaRest extends \VuFind\ILS\Driver\AbstractBase implements
                     );
                     if ($result['code'] >= 300) {
                         $results[$requestId]['status']
-                            = $result['data']['error'] ?? 'hold_error_update_failed'
+                            = $result['data']['error'] ?? 'hold_error_update_failed';
                     }
                 }
             }
