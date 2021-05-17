@@ -1898,11 +1898,7 @@ class Demo extends AbstractBase
             ? $session->holds[$lastHold]['item_id'] + 1 : 0;
 
         // Figure out appropriate expiration date:
-        if (empty($holdDetails['requiredBy'])) {
-            $expire = strtotime("now + 30 days");
-        } else {
-            $expire = $holdDetails['requiredByTS'];
-        }
+        $expire = $holdDetails['requiredByTS'] ?: strtotime('now + 30 days');
 
         $requestGroup = '';
         foreach ($this->getRequestGroups(null, null) as $group) {
@@ -1913,7 +1909,8 @@ class Demo extends AbstractBase
                 break;
             }
         }
-        if (!empty($holdDetails['startDate'])) {
+        if ($holdDetails['startDateTS']) {
+            // Suspend until the previous day:
             $frozen = true;
             $frozenUntil = $this->dateConverter->convertToDisplayDate(
                 'U',

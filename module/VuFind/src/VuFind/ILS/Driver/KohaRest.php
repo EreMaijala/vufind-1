@@ -1090,7 +1090,7 @@ class KohaRest extends \VuFind\ILS\Driver\AbstractBase implements
             return $this->holdError($result['data']['error'] ?? 'hold_error_fail');
         }
 
-        if ($holdDetails['startDateTS'] && $holdDetails['startDateTS'] > time()) {
+        if ($holdDetails['startDateTS']) {
             $holdId = $result['data']['hold_id'];
             // Suspend until the previous day from start date:
             $request = [
