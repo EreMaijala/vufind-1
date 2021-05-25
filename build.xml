@@ -328,9 +328,8 @@
       <istrue value="${apachectl}" />
       <then>
         <copy file="${srcdir}/local/httpd-vufind.conf" tofile="${apacheconfdir}/vufindtest.conf" />
-        <exec command="${apachectl} restart" outputProperty="LASTOUTPUT" />
-        <echo message="${LASTOUTPUT}" />
-      </then>
+        <exec command="${apachectl} restart" passthru="true" />
+        </then>
     </if>
 
     <!-- build and configure the requested database type -->
@@ -378,8 +377,7 @@
     <exec command="chmod a+w ${srcdir}/vufind-exception.log" />
 
     <!-- start Solr (use restart in case of old PID files) -->
-    <exec command="SOLR_PID_DIR=${srcdir}/local VUFIND_HOME=${srcdir} ${srcdir}/solr.sh restart" outputProperty="LASTOUTPUT" checkreturn="true" />
-    <echo message="${LASTOUTPUT}" />
+    <exec command="SOLR_PID_DIR=${srcdir}/local VUFIND_HOME=${srcdir} ${srcdir}/solr.sh restart" passthru="true" checkreturn="true" />
     <!-- fail if Solr did not start up successfully: -->
     <if>
       <not><available file="${solr_pid_file}" /></not>
@@ -412,8 +410,7 @@
     </foreach>
 
     <!-- build alphabrowse index -->
-    <exec command="VUFIND_HOME=${srcdir} VUFIND_LOCAL_DIR=${srcdir}/local ${srcdir}/index-alphabetic-browse.sh" outputProperty="LASTOUTPUT" />
-    <echo message="${LASTOUTPUT}" />
+    <exec command="VUFIND_HOME=${srcdir} VUFIND_LOCAL_DIR=${srcdir}/local ${srcdir}/index-alphabetic-browse.sh" passthru="true" />
   </target>
 
   <!-- Uninstall and Deactivate VuFind -->
@@ -442,8 +439,7 @@
     </if>
 
     <!-- stop Solr -->
-    <exec command="SOLR_PID_DIR=${srcdir}/local VUFIND_HOME=${srcdir} ${srcdir}/solr.sh stop" outputProperty="LASTOUTPUT" />
-    <echo message="${LASTOUTPUT}" />
+    <exec command="SOLR_PID_DIR=${srcdir}/local VUFIND_HOME=${srcdir} ${srcdir}/solr.sh stop" passthru="true" />
 
     <!-- run extra cleanup action, if any -->
     <if>
@@ -544,8 +540,7 @@
     <exec command="basename ${filename}" outputProperty="BASENAME" />
 
     <!-- perform the import -->
-    <exec command="VUFIND_HOME=${srcdir} VUFIND_LOCAL_DIR=${srcdir}/local ${srcdir}/import-marc-auth.sh ${filename} marc_auth_ils.properties" outputProperty="LASTOUTPUT" />
-    <echo message="${LASTOUTPUT}" />
+    <exec command="VUFIND_HOME=${srcdir} VUFIND_LOCAL_DIR=${srcdir}/local ${srcdir}/import-marc-auth.sh ${filename} marc_auth_ils.properties" passthru="true" />
   </target>
 
   <target name="importrec" description="import each of the MARC bibliographic test records">
@@ -577,7 +572,7 @@
     </if>
 
     <!-- perform the import -->
-    <exec command="VUFIND_HOME=${srcdir} VUFIND_LOCAL_DIR=${srcdir}/local ${srcdir}/import-marc.sh -p ${srcdir}/local/import/import-${BASENAME}.properties ${filename}" />
+    <exec command="VUFIND_HOME=${srcdir} VUFIND_LOCAL_DIR=${srcdir}/local ${srcdir}/import-marc.sh -p ${srcdir}/local/import/import-${BASENAME}.properties ${filename}" passthru="true" />
 
     <!-- clean up temp files -->
     <delete file="${srcdir}/local/import/marc-${BASENAME}.properties" />
