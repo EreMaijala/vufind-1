@@ -444,10 +444,30 @@
     </if>
 
     <!-- delete the configuration, sample index, logs and cache data -->
-    <delete file="${srcdir}/import/solrmarc.log" failonerror="true" />
-    <delete dir="${srcdir}/solr" includeemptydirs="true" failonerror="true" />
-    <delete file="${srcdir}/composer.phar" failonerror="false" />
-    <delete file="${srcdir}/vufind-exception.log" failonerror="false" />
+    <if>
+      <available file="${srcdir}/import/solrmarc.log" />
+      <then>
+        <delete file="${srcdir}/import/solrmarc.log" failonerror="true" />
+      </then>
+    </if>
+    <if>
+      <available file="${srcdir}/solr" type="dir" />
+      <then>
+        <delete dir="${srcdir}/solr" includeemptydirs="true" failonerror="true" />
+      </then>
+    </if>
+    <if>
+      <available file="${srcdir}/composer.phar" />
+      <then>
+        <delete file="${srcdir}/composer.phar" failonerror="false" />
+      </then>
+    </if>
+    <if>
+      <available file="${srcdir}/vufind-exception.log" />
+      <then>
+        <delete file="${srcdir}/vufind-exception.log" failonerror="false" />
+      </then>
+    </if>
     <delete dir="${srcdir}/vendor" includeemptydirs="true" failonerror="false" />
     <delete dir="${srcdir}/local" includeemptydirs="true" failonerror="true" />
     <exec command="git reset --hard" />
