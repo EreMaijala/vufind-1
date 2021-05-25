@@ -35,9 +35,17 @@
   <property name="version" value="7.1" />
 
   <!-- We only need the -p switch if the password is non-blank -->
-  <if><not><equals arg1="${mysqlrootpass}" arg2="" /></not><then>
-    <property name="mysqlpwswitch" value="-p" />
-  </then></if>
+  <if>
+    <not>
+      <equals arg1="${mysqlrootpass}" arg2="" />
+    </not>
+    <then>
+      <property name="mysqlpwswitch" value="-p" />
+    </then>
+    <else>
+      <property name="mysqlpwswitch" value="" />
+    </else>
+  </if>
 
   <!-- Main Target -->
   <target name="main" description="main target">
@@ -387,10 +395,16 @@
     </if>
 
     <!-- import marc test records into vufind index (note: the marc test records have prefix "testsample#") -->
-    <exec escape="false" command="find ${srcdir}/tests/data -name '*.mrc' -printf '%p,'" outputProperty="buglist" />
-    <foreach list="${buglist}" param="filename" delimiter="," target="importrec" />
-    <exec escape="false" command="find ${srcdir}/tests/data/authority -name '*.mrc' -printf '%p,'" outputProperty="authlist" />
-    <foreach list="${authlist}" param="filename" delimiter="," target="importauthrec" />
+    <foreach param="filename" target="importrec">
+      <fileset dir="${srcdir}/tests/data">
+          <include name="*.mrc" />
+      </fileset>
+    </foreach>
+    <foreach param="filename" target="importauthrec">
+      <fileset dir="${srcdir}/tests/data/authority">
+          <include name="*.mrc" />
+      </fileset>
+    </foreach>
 
     <!-- build alphabrowse index -->
     <exec command="VUFIND_HOME=${srcdir} VUFIND_LOCAL_DIR=${srcdir}/local ${srcdir}/index-alphabetic-browse.sh" outputProperty="LASTOUTPUT" />
@@ -522,48 +536,51 @@
   </target>
 
   <target name="importauthrec" description="import each of the MARC authority test records">
-    <if>
-    <istrue value="${filename}"/>       <!-- To ignore the last token, as find command output list has ',' after last filename -->
-      <then>
-        <exec command="basename ${filename}" outputProperty="BASENAME" />
+    <exec command="basename ${filename}" outputProperty="BASENAME" />
 
-        <!-- perform the import -->
-        <exec command="VUFIND_HOME=${srcdir} VUFIND_LOCAL_DIR=${srcdir}/local ${srcdir}/import-marc-auth.sh ${filename} marc_auth_ils.properties" outputProperty="LASTOUTPUT" />
-        <echo message="${LASTOUTPUT}" />
-      </then>
-    </if>
+    <!-- perform the import -->
+    <exec command="VUFIND_HOME=${srcdir} VUFIND_LOCAL_DIR=${srcdir}/local ${srcdir}/import-marc-auth.sh ${filename} marc_auth_ils.properties" outputProperty="LASTOUTPUT" />
+    <echo message="${LASTOUTPUT}" />
   </target>
 
   <target name="importrec" description="import each of the MARC bibliographic test records">
+    <exec command="basename ${filename}" outputProperty="BASENAME" />
+
+    <!-- create custom import configurations to load the MARC filename into the building facet to help
+          test cases to limit searches to within specific collections of test records.
+          Note: ${srcdir}/local/import/import.properties is created in install.php. -->
+    <copy file="${srcdir}/import/marc_local.properties" tofile="${srcdir}/local/import/marc-${BASENAME}.properties" />
+    <append destFile="${srcdir}/local/import/marc-${BASENAME}.properties" text="building=&quot;${BASENAME}${BASENAME}" />
+    <reflexive>
+      <fileset dir="${srcdir}/local/import">
+        <include pattern="import.properties" />
+      </fileset>
+      <filterchain>
+        <replaceregexp>
+          <regexp pattern="marc_local.properties" replace="marc-${BASENAME}.properties" />
+        </replaceregexp>
+      </filterchain>
+    </reflexive>
+
+
+
+
+    <!-- if there is a file-specific import configuration, load it now: -->
     <if>
-    <istrue value="${filename}"/>       <!-- To ignore the last token, as find command output list has ',' after last filename -->
+      <available file="${filename}.properties" />
       <then>
-        <exec command="basename ${filename}" outputProperty="BASENAME" />
-
-        <!-- create custom import configurations to load the MARC filename into the building facet to help
-             test cases to limit searches to within specific collections of test records. -->
-        <copy file="${srcdir}/import/marc_local.properties" tofile="${srcdir}/local/import/marc-${BASENAME}.properties" />
-        <exec command="echo building=\&quot;${BASENAME}\&quot; &gt;&gt; ${srcdir}/local/import/marc-${BASENAME}.properties" />
-        <exec command="sed -e &quot;s!marc_local.properties!marc-${BASENAME}.properties!&quot; ${srcdir}/local/import/import.properties &gt; ${srcdir}/local/import/import-${BASENAME}.properties" />
-
-        <!-- if there is a file-specific import configuration, load it now: -->
-        <if>
-          <available file="${filename}.properties" />
-          <then>
-            <echo message="Found custom import configs for ${filename}." />
-            <exec command="cat ${filename}.properties &gt;&gt; ${srcdir}/local/import/marc-${BASENAME}.properties" />
-          </then>
-        </if>
-
-        <!-- perform the import -->
-        <exec command="VUFIND_HOME=${srcdir} VUFIND_LOCAL_DIR=${srcdir}/local ${srcdir}/import-marc.sh -p ${srcdir}/local/import/import-${BASENAME}.properties ${filename}" outputProperty="LASTOUTPUT" />
-        <echo message="${LASTOUTPUT}" />
-
-        <!-- clean up temp files -->
-        <delete file="${srcdir}/local/import/marc-${BASENAME}.properties" />
-        <delete file="${srcdir}/local/import/import-${BASENAME}.properties" />
+        <echo message="Found custom import configs for ${filename}." />
+        <exec command="cat ${filename}.properties &gt;&gt; ${srcdir}/local/import/marc-${BASENAME}.properties" />
       </then>
     </if>
+
+    <!-- perform the import -->
+    <exec command="VUFIND_HOME=${srcdir} VUFIND_LOCAL_DIR=${srcdir}/local ${srcdir}/import-marc.sh -p ${srcdir}/local/import/import-${BASENAME}.properties ${filename}" outputProperty="LASTOUTPUT" />
+    <echo message="${LASTOUTPUT}" />
+
+    <!-- clean up temp files -->
+    <delete file="${srcdir}/local/import/marc-${BASENAME}.properties" />
+    <delete file="${srcdir}/local/import/import-${BASENAME}.properties" />
   </target>
 
   <target name="patch-dependencies" description="apply fixes to dependencies">
