@@ -485,7 +485,7 @@
     </if>
     <delete dir="${srcdir}/vendor" includeemptydirs="true" failonerror="false" />
     <delete dir="${srcdir}/local" includeemptydirs="true" failonerror="true" />
-    <exec command="git reset --hard" />
+    <exec command="git reset --hard" passthru="true" />
   </target>
 
   <!-- Prepare VuFind for distribution -->
