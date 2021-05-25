@@ -567,21 +567,17 @@
       </filterchain>
     </reflexive>
 
-
-
-
     <!-- if there is a file-specific import configuration, load it now: -->
     <if>
       <available file="${filename}.properties" />
       <then>
         <echo message="Found custom import configs for ${filename}." />
-        <exec command="cat ${filename}.properties &gt;&gt; ${srcdir}/local/import/marc-${BASENAME}.properties" />
+        <append file="${filename}.properties" destFile="${srcdir}/local/import/marc-${BASENAME}.properties" />
       </then>
     </if>
 
     <!-- perform the import -->
-    <exec command="VUFIND_HOME=${srcdir} VUFIND_LOCAL_DIR=${srcdir}/local ${srcdir}/import-marc.sh -p ${srcdir}/local/import/import-${BASENAME}.properties ${filename}" outputProperty="LASTOUTPUT" />
-    <echo message="${LASTOUTPUT}" />
+    <exec command="VUFIND_HOME=${srcdir} VUFIND_LOCAL_DIR=${srcdir}/local ${srcdir}/import-marc.sh -p ${srcdir}/local/import/import-${BASENAME}.properties ${filename}" />
 
     <!-- clean up temp files -->
     <delete file="${srcdir}/local/import/marc-${BASENAME}.properties" />
