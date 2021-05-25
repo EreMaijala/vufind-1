@@ -555,7 +555,7 @@
           test cases to limit searches to within specific collections of test records.
           Note: ${srcdir}/local/import/import.properties is created in install.php. -->
     <copy file="${srcdir}/import/marc_local.properties" tofile="${srcdir}/local/import/marc-${BASENAME}.properties" />
-    <append destFile="${srcdir}/local/import/marc-${BASENAME}.properties" text="building=&quot;${BASENAME}${BASENAME}" />
+    <append destFile="${srcdir}/local/import/marc-${BASENAME}.properties" text="building=&quot;${BASENAME}&quot;" fixlastline="true" />
     <reflexive>
       <fileset dir="${srcdir}/local/import">
         <include pattern="import.properties" />
@@ -572,7 +572,7 @@
       <available file="${filename}.properties" />
       <then>
         <echo message="Found custom import configs for ${filename}." />
-        <append file="${filename}.properties" destFile="${srcdir}/local/import/marc-${BASENAME}.properties" />
+        <append file="${filename}.properties" destFile="${srcdir}/local/import/marc-${BASENAME}.properties" fixlastline="true" />
       </then>
     </if>
 
