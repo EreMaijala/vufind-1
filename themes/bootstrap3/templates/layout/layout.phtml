@@ -64,6 +64,14 @@
         $this->headScript()->appendFile("account_ajax.js");
       }
 
+      $this->jsTranslations()->addStrings(
+        [
+          'nohit_change_tab' => 'nohit_change_tab',
+          'nohit_change_tab_html' => 'nohit_change_tab',
+          'nohit_lookfor_html' => 'nohit_lookfor_html'
+        ]
+      );
+
       $root = rtrim($this->url('home'), '/');
       $translations = !isset($this->renderingError) ? $this->render('js-translations.phtml') : '{}';
       $dsb = DEFAULT_SEARCH_BACKEND;
@@ -71,6 +79,15 @@
 VuFind.path = '{$root}';
 VuFind.defaultSearchBackend = '{$dsb}';
 VuFind.addTranslations({$translations});
+$(document).ready(function() {
+
+  $('#test_html_key').html('_html key in JS: ' + VuFind.translate('nohit_change_tab_html', {'%%activeTab%%': 'Foo'}));
+
+  $('#test_html').html('HTML translation: ' + VuFind.translate('nohit_lookfor_html', {'%%lookfor%%': 'Foo'}));
+
+  // No _html, so normal text, right? No.
+  $('#test_non_html_key').text('No _html key in JS: ' + VuFind.translate('nohit_change_tab', {'%%activeTab%%': 'Foo'}));
+});
 JS;
       $this->headScript()->appendScript(implode("\n", $appendScripts));
 
@@ -81,6 +98,9 @@ JS;
     <?=$this->headScript()?>
   </head>
   <body class="template-dir-<?=$this->templateDir?> template-name-<?=$this->templateName?> <?=$this->layoutClass('offcanvas-row')?><?php if ($this->layout()->rtl): ?> rtl<?php endif; ?>">
+    <div id="test_html_key" style="border: 1px solid blue; height: 40px;"></div>
+    <div id="test_html" style="border: 1px solid green; height: 40px;"></div>
+    <div id="test_non_html_key" style="border: 1px solid red; height: 40px;"></div>
     <?php // Set up the search box -- there are three possible cases:
       // 1. No search box was set; we should default to the normal box
       // 2. It was set to false; we should display nothing
