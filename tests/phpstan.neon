@@ -1,6 +1,7 @@
 parameters:
     paths:
         - %currentWorkingDirectory%/module/Finna
+        - %currentWorkingDirectory%/module/FinnaApi
         - %currentWorkingDirectory%/module/FinnaSearch
         - %currentWorkingDirectory%/module/VuFind
         - %currentWorkingDirectory%/module/VuFindAdmin
