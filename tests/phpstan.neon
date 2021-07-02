@@ -1,6 +1,6 @@
 parameters:
     paths:
-        - %currentWorkingDirectory%/module
+        - %currentWorkingDirectory%/module/VuFind
     excludePaths:
         analyse:
               # Analysis would crash on PHP 8 due to a signature change in PDO
