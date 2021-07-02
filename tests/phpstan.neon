@@ -1,19 +1,6 @@
 parameters:
     paths:
-        - %currentWorkingDirectory%/module/Finna
-        - %currentWorkingDirectory%/module/FinnaApi
-        - %currentWorkingDirectory%/module/FinnaConsole
-        - %currentWorkingDirectory%/module/FinnaCustom
-        - %currentWorkingDirectory%/module/FinnaSearch
-        - %currentWorkingDirectory%/module/FinnaTheme
-        - %currentWorkingDirectory%/module/VuFind
-        - %currentWorkingDirectory%/module/VuFindAdmin
-        - %currentWorkingDirectory%/module/VuFindApi
-        - %currentWorkingDirectory%/module/VuFindConsole
-        - %currentWorkingDirectory%/module/VuFindDevTools
-        - %currentWorkingDirectory%/module/VuFindLocalTemplate
-        - %currentWorkingDirectory%/module/VuFindSearch
-        - %currentWorkingDirectory%/module/VuFindTheme
+        - %currentWorkingDirectory%/module
     excludePaths:
         analyse:
               # Analysis would crash on PHP 8 due to a signature change in PDO
