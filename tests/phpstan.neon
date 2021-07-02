@@ -3,7 +3,9 @@ parameters:
         - %currentWorkingDirectory%/module/Finna
         - %currentWorkingDirectory%/module/FinnaApi
         - %currentWorkingDirectory%/module/FinnaConsole
+        - %currentWorkingDirectory%/module/FinnaCustom
         - %currentWorkingDirectory%/module/FinnaSearch
+        - %currentWorkingDirectory%/module/FinnaTheme
         - %currentWorkingDirectory%/module/VuFind
         - %currentWorkingDirectory%/module/VuFindAdmin
         - %currentWorkingDirectory%/module/VuFindApi
