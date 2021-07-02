@@ -11,7 +11,7 @@ jobs:
       VUFIND_LOCAL_DIR: $GITHUB_WORKSPACE/local
     strategy:
       matrix:
-        php-version: ['7.3', '7.4', '8.0']
+        php-version: ['8.0']
         include:
           - php-version: 7.3
             phing_tasks: "phpstan-console"
