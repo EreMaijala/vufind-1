@@ -13,10 +13,6 @@ jobs:
       matrix:
         php-version: ['8.0']
         include:
-          - php-version: 7.3
-            phing_tasks: "phpstan-console"
-          - php-version: 7.4
-            phing_tasks: "phpstan-console"
           - php-version: 8.0
             phing_tasks: "phpstan-console"
 

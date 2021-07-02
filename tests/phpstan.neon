@@ -1,6 +1,13 @@
 parameters:
     paths:
-        - %currentWorkingDirectory%/module/VuFind*
+        - %currentWorkingDirectory%/module/VuFind
+        - %currentWorkingDirectory%/module/VuFindAdmin
+        - %currentWorkingDirectory%/module/VuFindApi
+        - %currentWorkingDirectory%/module/VuFindConsole
+        - %currentWorkingDirectory%/module/VuFindDevTools
+        - %currentWorkingDirectory%/module/VuFindLocalTemplate
+        - %currentWorkingDirectory%/module/VuFindSearch
+        - %currentWorkingDirectory%/module/VuFindTheme
     excludePaths:
         analyse:
               # Analysis would crash on PHP 8 due to a signature change in PDO
