@@ -70,7 +70,7 @@
     <mkdir dir="${builddir}/reports/coverage"/>
 
     <!-- Call standard tasks -->
-    <phingcall target="phpcs"/>
+    <!--<phingcall target="phpcs"/>
     <phingcall target="php-cs-fixer-dryrun"/>
     <phingcall target="phpunit"/>
     <phingcall target="phpdoc"/>
@@ -79,7 +79,7 @@
     <phingcall target="pdepend"/>
     <phingcall target="phploc"/>
     <phingcall target="eslint-report"/>
-    <phingcall target="jshint-report"/>
+    <phingcall target="jshint-report"/>-->
     <phingcall target="phpstan-checkstyle"/>
   </target>
 
