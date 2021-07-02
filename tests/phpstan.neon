@@ -11,7 +11,5 @@ parameters:
         - '#Class VuFind\\Content\\[a-zA-Z0-9]+\\SyndeticsPlus not found#'
         - '#Class VuFind\\Content\\[a-zA-Z0-9]+\\Amazon[a-zA-Z0-9]* not found#'
     level: 0
-    scanDirectories:
-        - %currentWorkingDirectory%/vendor/laminas/laminas-stdlib/src
     parallel:
         processTimeout: 600.0
